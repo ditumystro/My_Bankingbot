@@ -1,7 +1,9 @@
 'use strict';
 
+//import {GOOGLE_CLIENT_EMAIL} from "./config";
+
 const dialogflow = require('dialogflow');
-const config = require('./config');
+const config = require('./config.js');
 const express = require('express');
 const crypto = require('crypto');
 const bodyParser = require('body-parser');
@@ -38,10 +40,10 @@ if (!config.SERVER_URL) { //used for ink to static files
 
 
 
-app.set('port', (process.env.PORT || 5000))
+app.set('port', (process.env.PORT || 5000));
 
 //verify request came from facebook
-app.use(bodyParser.json({
+app.use(bodyparser.json({
     verify: verifyRequestSignature
 }));
 
@@ -49,12 +51,12 @@ app.use(bodyParser.json({
 app.use(express.static('public'));
 
 // Process application/x-www-form-urlencoded
-app.use(bodyParser.urlencoded({
+app.use(urlencoded({
     extended: false
 }));
 
 // Process application/json
-app.use(bodyParser.json());
+app.use(bodyparser.json());
 
 
 
@@ -66,7 +68,7 @@ const credentials = {
     private_key: config.GOOGLE_PRIVATE_KEY,
 };
 
-const sessionClient = new dialogflow.SessionsClient(
+const sessionClient = new SessionsClient(
     {
         projectId: config.GOOGLE_PROJECT_ID,
         credentials
@@ -78,13 +80,13 @@ const sessionIds = new Map();
 
 // Index route
 app.get('/', function (req, res) {
-    res.send('Hello world, I am a chat bot')
-})
+    res.send('Hello world, I am a chat bot');
+});
 
 // for Facebook verification
 app.get('/webhook/', function (req, res) {
     console.log("request");
-    if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === config.FB_VERIFY_TOKEN) {
+    if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === FB_VERIFY_TOKEN) {
         res.status(200).send(req.query['hub.challenge']);
     } else {
         console.error("Failed validation. Make sure the validation tokens match.");
@@ -151,7 +153,7 @@ function receivedMessage(event) {
     var message = event.message;
 
     if (!sessionIds.has(senderID)) {
-        sessionIds.set(senderID, uuid.v1());
+        sessionIds.set(senderID, v1());
     }
     //console.log("Received message for user %d and page %d at %d with message:", senderID, recipientID, timeOfMessage);
     //console.log(JSON.stringify(message));
@@ -336,7 +338,7 @@ async function sendToDialogFlow(sender, textString, params) {
 
     try {
         const sessionPath = sessionClient.sessionPath(
-            config.GOOGLE_PROJECT_ID,
+            GOOGLE_PROJECT_ID,
             sessionIds.get(sender)
         );
 
@@ -345,7 +347,7 @@ async function sendToDialogFlow(sender, textString, params) {
             queryInput: {
                 text: {
                     text: textString,
-                    languageCode: config.DF_LANGUAGE_CODE,
+                    languageCode: DF_LANGUAGE_CODE,
                 },
             },
             queryParams: {
@@ -402,71 +404,6 @@ function sendImageMessage(recipientId, imageUrl) {
     callSendAPI(messageData);
 }
 
-/*
- * Send a Gif using the Send API.
- *
- */
-function sendGifMessage(recipientId) {
-    var messageData = {
-        recipient: {
-            id: recipientId
-        },
-        message: {
-            attachment: {
-                type: "image",
-                payload: {
-                    url: config.SERVER_URL + "/assets/instagram_logo.gif"
-                }
-            }
-        }
-    };
-
-    callSendAPI(messageData);
-}
-
-/*
- * Send audio using the Send API.
- *
- */
-function sendAudioMessage(recipientId) {
-    var messageData = {
-        recipient: {
-            id: recipientId
-        },
-        message: {
-            attachment: {
-                type: "audio",
-                payload: {
-                    url: config.SERVER_URL + "/assets/sample.mp3"
-                }
-            }
-        }
-    };
-
-    callSendAPI(messageData);
-}
-
-/*
- * Send a video using the Send API.
- * example videoName: "/assets/allofus480.mov"
- */
-function sendVideoMessage(recipientId, videoName) {
-    var messageData = {
-        recipient: {
-            id: recipientId
-        },
-        message: {
-            attachment: {
-                type: "video",
-                payload: {
-                    url: config.SERVER_URL + videoName
-                }
-            }
-        }
-    };
-
-    callSendAPI(messageData);
-}
 
 /*
  * Send a video using the Send API.
@@ -481,7 +418,7 @@ function sendFileMessage(recipientId, fileName) {
             attachment: {
                 type: "file",
                 payload: {
-                    url: config.SERVER_URL + fileName
+                    url: SERVER_URL + fileName
                 }
             }
         }
@@ -654,7 +591,7 @@ function sendAccountLinking(recipientId) {
                     text: "Welcome. Link your account.",
                     buttons: [{
                         type: "account_link",
-                        url: config.SERVER_URL + "/authorize"
+                        url: SERVER_URL + "/authorize"
                     }]
                 }
             }
@@ -673,7 +610,7 @@ function callSendAPI(messageData) {
     request({
         uri: 'https://graph.facebook.com/v3.2/me/messages',
         qs: {
-            access_token: config.FB_PAGE_TOKEN
+            access_token: FB_PAGE_TOKEN
         },
         method: 'POST',
         json: messageData
@@ -838,7 +775,7 @@ function verifyRequestSignature(req, res, buf) {
         var method = elements[0];
         var signatureHash = elements[1];
 
-        var expectedHash = crypto.createHmac('sha1', config.FB_APP_SECRET)
+        var expectedHash = createHmac('sha1', FB_APP_SECRET)
             .update(buf)
             .digest('hex');
 
