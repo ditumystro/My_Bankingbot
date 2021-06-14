@@ -11,28 +11,28 @@ const uuid = require('uuid');
 
 
 // Messenger API parameters
-if (!config.FB_PAGE_TOKEN) {
+/**if (!FB_PAGE_TOKEN) {
     throw new Error('missing FB_PAGE_TOKEN');
 }
-if (!config.FB_VERIFY_TOKEN) {
+/**if (!FB_VERIFY_TOKEN) {
     throw new Error('missing FB_VERIFY_TOKEN');
-}
-if (!config.GOOGLE_PROJECT_ID) {
+}**/
+if (!GOOGLE_PROJECT_ID) {
     throw new Error('missing GOOGLE_PROJECT_ID');
 }
-if (!config.DF_LANGUAGE_CODE) {
+if (!DF_LANGUAGE_CODE) {
     throw new Error('missing DF_LANGUAGE_CODE');
 }
-if (!config.GOOGLE_CLIENT_EMAIL) {
+if (!GOOGLE_CLIENT_EMAIL) {
     throw new Error('missing GOOGLE_CLIENT_EMAIL');
 }
-if (!config.GOOGLE_PRIVATE_KEY) {
+if (!GOOGLE_PRIVATE_KEY) {
     throw new Error('missing GOOGLE_PRIVATE_KEY');
 }
-if (!config.FB_APP_SECRET) {
+if (!FB_APP_SECRET) {
     throw new Error('missing FB_APP_SECRET');
 }
-if (!config.SERVER_URL) { //used for ink to static files
+if (!SERVER_URL) { //used for ink to static files
     throw new Error('missing SERVER_URL');
 }
 
@@ -41,20 +41,20 @@ if (!config.SERVER_URL) { //used for ink to static files
 app.set('port', (process.env.PORT || 5000))
 
 //verify request came from facebook
-app.use(bodyParser.json({
+app.use(_json({
     verify: verifyRequestSignature
 }));
 
 //serve static files in the public directory
-app.use(express.static('public'));
+app.use('public');
 
 // Process application/x-www-form-urlencoded
-app.use(bodyParser.urlencoded({
+app.use(urlencoded({
     extended: false
 }));
 
 // Process application/json
-app.use(bodyParser.json());
+app.use(_json());
 
 
 
@@ -62,13 +62,13 @@ app.use(bodyParser.json());
 
 
 const credentials = {
-    client_email: config.GOOGLE_CLIENT_EMAIL,
-    private_key: config.GOOGLE_PRIVATE_KEY,
+    client_email: GOOGLE_CLIENT_EMAIL,
+    private_key: GOOGLE_PRIVATE_KEY,
 };
 
-const sessionClient = new dialogflow.SessionsClient(
+const sessionClient = new SessionsClient(
     {
-        projectId: config.GOOGLE_PROJECT_ID,
+        projectId: GOOGLE_PROJECT_ID,
         credentials
     }
 );
@@ -84,7 +84,7 @@ app.get('/', function (req, res) {
 // for Facebook verification
 app.get('/webhook/', function (req, res) {
     console.log("request");
-    if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === config.FB_VERIFY_TOKEN) {
+    if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === FB_VERIFY_TOKEN) {
         res.status(200).send(req.query['hub.challenge']);
     } else {
         console.error("Failed validation. Make sure the validation tokens match.");
@@ -151,7 +151,7 @@ function receivedMessage(event) {
     var message = event.message;
 
     if (!sessionIds.has(senderID)) {
-        sessionIds.set(senderID, uuid.v1());
+        sessionIds.set(senderID, v1());
     }
     //console.log("Received message for user %d and page %d at %d with message:", senderID, recipientID, timeOfMessage);
     //console.log(JSON.stringify(message));
@@ -336,7 +336,7 @@ async function sendToDialogFlow(sender, textString, params) {
 
     try {
         const sessionPath = sessionClient.sessionPath(
-            config.GOOGLE_PROJECT_ID,
+            GOOGLE_PROJECT_ID,
             sessionIds.get(sender)
         );
 
@@ -345,7 +345,7 @@ async function sendToDialogFlow(sender, textString, params) {
             queryInput: {
                 text: {
                     text: textString,
-                    languageCode: config.DF_LANGUAGE_CODE,
+                    languageCode: DF_LANGUAGE_CODE,
                 },
             },
             queryParams: {
@@ -402,71 +402,6 @@ function sendImageMessage(recipientId, imageUrl) {
     callSendAPI(messageData);
 }
 
-/*
- * Send a Gif using the Send API.
- *
- */
-function sendGifMessage(recipientId) {
-    var messageData = {
-        recipient: {
-            id: recipientId
-        },
-        message: {
-            attachment: {
-                type: "image",
-                payload: {
-                    url: config.SERVER_URL + "/assets/instagram_logo.gif"
-                }
-            }
-        }
-    };
-
-    callSendAPI(messageData);
-}
-
-/*
- * Send audio using the Send API.
- *
- */
-function sendAudioMessage(recipientId) {
-    var messageData = {
-        recipient: {
-            id: recipientId
-        },
-        message: {
-            attachment: {
-                type: "audio",
-                payload: {
-                    url: config.SERVER_URL + "/assets/sample.mp3"
-                }
-            }
-        }
-    };
-
-    callSendAPI(messageData);
-}
-
-/*
- * Send a video using the Send API.
- * example videoName: "/assets/allofus480.mov"
- */
-function sendVideoMessage(recipientId, videoName) {
-    var messageData = {
-        recipient: {
-            id: recipientId
-        },
-        message: {
-            attachment: {
-                type: "video",
-                payload: {
-                    url: config.SERVER_URL + videoName
-                }
-            }
-        }
-    };
-
-    callSendAPI(messageData);
-}
 
 /*
  * Send a video using the Send API.
@@ -481,7 +416,7 @@ function sendFileMessage(recipientId, fileName) {
             attachment: {
                 type: "file",
                 payload: {
-                    url: config.SERVER_URL + fileName
+                    url: SERVER_URL + fileName
                 }
             }
         }
@@ -654,7 +589,7 @@ function sendAccountLinking(recipientId) {
                     text: "Welcome. Link your account.",
                     buttons: [{
                         type: "account_link",
-                        url: config.SERVER_URL + "/authorize"
+                        url: SERVER_URL + "/authorize"
                     }]
                 }
             }
@@ -673,7 +608,7 @@ function callSendAPI(messageData) {
     request({
         uri: 'https://graph.facebook.com/v3.2/me/messages',
         qs: {
-            access_token: config.FB_PAGE_TOKEN
+            access_token: FB_PAGE_TOKEN
         },
         method: 'POST',
         json: messageData
@@ -838,7 +773,7 @@ function verifyRequestSignature(req, res, buf) {
         var method = elements[0];
         var signatureHash = elements[1];
 
-        var expectedHash = crypto.createHmac('sha1', config.FB_APP_SECRET)
+        var expectedHash = createHmac('sha1', FB_APP_SECRET)
             .update(buf)
             .digest('hex');
 
