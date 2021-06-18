@@ -6,9 +6,11 @@ const express = require('express');
 const crypto = require('crypto');
 const bodyParser = require('body-parser');
 const request = require('request');
+const pg = require('pg');
 const app = express();
 const uuid = require('uuid');
 
+pg.defaults.ssl = true;
 
 // Messenger API parameters
 if (!config.FB_PAGE_TOKEN) {
@@ -36,24 +38,28 @@ if (!config.SERVER_URL) { //used for ink to static files
     throw new Error('missing SERVER_URL');
 }
 
+if (!config.PG_CONFIG){
+    throw new Error('missing PG_CONFIG');
+}
+
 
 
 app.set('port', (process.env.PORT || 5000))
 
-//verify request came from facebook
+
 app.use(bodyParser.json({
     verify: verifyRequestSignature
 }));
 
-//serve static files in the public directory
+
 app.use(express.static('public'));
 
-// Process application/x-www-form-urlencoded
+
 app.use(bodyParser.urlencoded({
     extended: false
 }));
 
-// Process application/json
+
 app.use(bodyParser.json());
 
 
@@ -78,7 +84,7 @@ const sessionIds = new Map();
 
 // Index route
 app.get('/', function (req, res) {
-    res.send('Hello world, I am a chat bot')
+    res.send('Hello friends, I am your chatbanking app ')
 })
 
 // for Facebook verification
@@ -722,6 +728,53 @@ function receivedPostback(event) {
 
     }
 
+    function greetUserText(userId){
+        request({
+            uri: 'https://graph.facebook.com/v3.2' + userId,
+            qs:{
+                access_token: config.FB_PAGE_TOKEN
+            }
+        }, function(error, response, body){
+            if(!error && response.statusCode == 200){
+                var user = JSON.parse(body);
+                console.log('getUserData: ' + user);
+                if (user.first_name){
+
+                    var pool = new pg.Pool(config.PG_CONFIG);
+                    pool.connect(function(err, client, done){
+                        if(err){
+                            return console.error('Error acquiring client', err.stack);
+                        }
+                        var rows = [];
+                        client.query(`SELECT fb_id FROM users WHERE fb_id='${userId}' LIMIT 1`,
+                            function(err, result){
+                                if(err){
+                                    console.log('Query error: ' +err);
+
+                                }else {
+                                    if(result.rows.length ===0){
+                                        let sql ='INSERT INTO users (fb_id, first_name, last_name, profile_pic)' + 'VALUES ($1, $2, $3, $4)';
+
+                                        client.query(sql,
+                                            [
+                                                userId,
+                                                user.first_time,
+                                                user.last_name,
+                                                user.profile_pic
+                                            ]);
+                                    }
+                                }
+                            });
+                    });
+
+                    pool.end();
+
+                    sendTextMessage(userId, "Welcome" + user.first_name + '!' + 'what can i do for you!');
+                }
+            }
+        })
+    }
+
     console.log("Received postback for user %d and page %d with payload '%s' " +
         "at %d", senderID, recipientID, payload, timeOfPostback);
 
@@ -752,8 +805,7 @@ function receivedMessageRead(event) {
  *
  * This event is called when the Link Account or UnLink Account action has been
  * tapped.
- * https://developers.facebook.com/docs/messenger-platform/webhook-reference/account-linking
- * 
+ *
  */
 function receivedAccountLink(event) {
     var senderID = event.sender.id;
@@ -767,9 +819,7 @@ function receivedAccountLink(event) {
 }
 
 /*
- * Delivery Confirmation Event
- *
- * This event is sent to confirm the delivery of a message. Read more about 
+ * This event is sent to confirm the delivery of a message. Read more about
  * these fields at https://developers.facebook.com/docs/messenger-platform/webhook-reference/message-delivered
  *
  */
@@ -791,14 +841,6 @@ function receivedDeliveryConfirmation(event) {
     console.log("All message before %d were delivered.", watermark);
 }
 
-/*
- * Authorization Event
- *
- * The value for 'optin.ref' is defined in the entry point. For the "Send to 
- * Messenger" plugin, it is the 'data-ref' field. Read more at 
- * https://developers.facebook.com/docs/messenger-platform/webhook-reference/authentication
- *
- */
 function receivedAuthentication(event) {
     var senderID = event.sender.id;
     var recipientID = event.recipient.id;
@@ -821,11 +863,7 @@ function receivedAuthentication(event) {
 }
 
 /*
- * Verify that the callback came from Facebook. Using the App Secret from 
- * the App Dashboard, we can verify the signature that is sent with each 
- * callback in the x-hub-signature field, located in the header.
- *
- * https://developers.facebook.com/docs/graph-api/webhooks#setup
+  * https://developers.facebook.com/docs/graph-api/webhooks#setup
  *
  */
 function verifyRequestSignature(req, res, buf) {
